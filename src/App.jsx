@@ -1,60 +1,74 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { isAuthenticated, clearToken } from './api/nodus';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useAuthStore } from './stores/authStore.js'
+import { useThemeStore } from './stores/themeStore.js'
 
-import Login from './pages/Login';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Clientes from './pages/Clientes';
-import Finanzas from './pages/Finanzas';
-import TransaccionDetalle from './pages/TransaccionDetalle';
-import NuevaTransaccion from './pages/NuevaTransaccion';
+import AuthLayout from './layouts/AuthLayout.jsx'
+import AppLayout from './layouts/AppLayout.jsx'
+
+import LoginPage from './pages/LoginPage.jsx'
+import RegistroPage from './pages/RegistroPage.jsx'
+import RecuperarPasswordPage from './pages/RecuperarPasswordPage.jsx'
+import DashboardPage from './pages/DashboardPage.jsx'
+import CuentasPage from './pages/CuentasPage.jsx'
+import TransaccionesPage from './pages/TransaccionesPage.jsx'
+import CategoriasPage from './pages/CategoriasPage.jsx'
+import DeudasPage from './pages/DeudasPage.jsx'
+import DetalleDeudaPage from './pages/DetalleDeudaPage.jsx'
+import ContactosPage from './pages/ContactosPage.jsx'
+import AsistenteIAPage from './pages/AsistenteIAPage.jsx'
+import ConfiguracionPage from './pages/ConfiguracionPage.jsx'
+import NotFoundPage from './pages/NotFoundPage.jsx'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 1000 * 60 * 5, retry: 1 },
+  },
+})
+
+function ProtectedRoute({ children }) {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  if (!accessToken) return <Navigate to="/login" replace />
+  return children
+}
+
+function PublicRoute({ children }) {
+  const accessToken = useAuthStore((s) => s.accessToken)
+  if (accessToken) return <Navigate to="/dashboard" replace />
+  return children
+}
 
 export default function App() {
-  const [user, setUser] = useState(isAuthenticated() ? 'Yerlis' : null);
-  const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('nodus_theme');
-    if (saved === 'dark') {
-      document.documentElement.classList.add('dark');
-      return true;
-    }
-    return false;
-  });
-
-  const handleLogin = (name) => {
-    setUser(name);
-  };
-
-  const handleLogout = () => {
-    clearToken();
-    setUser(null);
-  };
-
-  const toggleDark = () => {
-    const next = !isDark;
-    setIsDark(next);
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem('nodus_theme', next ? 'dark' : 'light');
-  };
-
-  if (!user) {
-    return <Login onLogin={handleLogin} />;
-  }
+  const hydrate = useThemeStore((s) => s.hydrate)
+  useEffect(() => { hydrate() }, [hydrate])
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route element={<Layout onToggleDark={toggleDark} isDark={isDark} user={user} onLogout={handleLogout} />}>
-          <Route path="/" element={<Home user={user} />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/finanzas" element={<Finanzas />} />
-          <Route path="/transaccion/:id" element={<TransaccionDetalle />} />
-          <Route path="/nueva-transaccion" element={<NuevaTransaccion />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  );
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<PublicRoute><AuthLayout /></PublicRoute>}>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/registro" element={<RegistroPage />} />
+            <Route path="/recuperar-password" element={<RecuperarPasswordPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/cuentas" element={<CuentasPage />} />
+            <Route path="/transacciones" element={<TransaccionesPage />} />
+            <Route path="/categorias" element={<CategoriasPage />} />
+            <Route path="/deudas" element={<DeudasPage />} />
+            <Route path="/deudas/:id" element={<DetalleDeudaPage />} />
+            <Route path="/contactos" element={<ContactosPage />} />
+            <Route path="/ai" element={<AsistenteIAPage />} />
+            <Route path="/configuracion" element={<ConfiguracionPage />} />
+          </Route>
+
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  )
 }
